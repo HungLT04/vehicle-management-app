@@ -172,20 +172,54 @@ function initApp() {
 }
 
 function fetchUsers() {
+  var db = getLocalMockDb();
+  var localUsers = db.users || [];
   var defaultAdmin = { id: "00000000-0000-0000-0000-000000000001", email: "admin@example.com", name: "Quản Trị Viên", username: "admin", password: "123456", role: "ADMIN", assigned_vehicles: "ALL" };
 
   if (AppState.supabase) {
     return AppState.supabase.from('profiles').select('*').then(function(res) {
-      var list = (!res.error && res.data && res.data.length > 0) ? res.data : [defaultAdmin];
-      return list;
+      var supaList = (!res.error && res.data) ? res.data : [];
+      var userMap = {};
+      userMap[defaultAdmin.id] = defaultAdmin;
+
+      localUsers.forEach(function(u) {
+        if (u && u.id) userMap[u.id] = u;
+      });
+
+      supaList.forEach(function(u) {
+        if (u && u.id) {
+          if (userMap[u.id]) {
+            userMap[u.id] = Object.assign({}, userMap[u.id], u);
+          } else {
+            userMap[u.id] = {
+              id: u.id,
+              name: u.name || u.email || 'User',
+              username: u.username || u.name,
+              email: u.email || '',
+              password: u.password || '123456',
+              role: u.role || 'USER',
+              assigned_vehicles: u.assigned_vehicles || 'ALL'
+            };
+          }
+        }
+      });
+
+      var combined = Object.values(userMap);
+      if (combined.length === 0) combined = [defaultAdmin];
+
+      db.users = combined;
+      saveLocalMockDb(db);
+
+      return combined;
     }).catch(function(err) {
-      console.warn("Fetch profiles Supabase error:", err);
-      var db = getLocalMockDb();
-      return (db.users && db.users.length > 0) ? db.users : [defaultAdmin];
+      console.warn("Fetch profiles Supabase error, using local:", err);
+      var list = (localUsers && localUsers.length > 0) ? localUsers : [defaultAdmin];
+      return list;
     });
   }
-  var db = getLocalMockDb();
-  return Promise.resolve((db.users && db.users.length > 0) ? db.users : [defaultAdmin]);
+
+  var list = (localUsers && localUsers.length > 0) ? localUsers : [defaultAdmin];
+  return Promise.resolve(list);
 }
 
 function showLoginScreen(show) {
@@ -1757,44 +1791,49 @@ function saveUserSubmit(event) {
     assigned_vehicles: assignedVehicles
   };
 
-  var profilePayload = {
-    id: targetId,
-    name: name,
-    email: email || (name + "@local"),
-    role: role,
-    assigned_vehicles: assignedVehicles
-  };
+  updateUserInLocalState(targetId, userObj, isEdit);
 
-  var promise;
+  var syncPromise = Promise.resolve();
   if (AppState.supabase) {
-    if (isEdit) {
-      promise = AppState.supabase.from('profiles').update(profilePayload).eq('id', targetId).then(function(res) {
-        if (res.error) throw res.error;
-        return res;
-      });
-    } else {
-      promise = AppState.supabase.from('profiles').insert([profilePayload]).then(function(res) {
-        if (res.error) throw res.error;
-        return res;
-      });
-    }
-  } else {
-    promise = Promise.resolve();
+    var profilePayload = {
+      id: targetId,
+      name: name,
+      username: name,
+      password: password,
+      email: email || (name + "@local"),
+      role: role,
+      assigned_vehicles: assignedVehicles
+    };
+
+    var query = isEdit
+      ? AppState.supabase.from('profiles').update(profilePayload).eq('id', targetId)
+      : AppState.supabase.from('profiles').insert([profilePayload]);
+
+    syncPromise = query.then(function(res) {
+      if (res.error) {
+        console.warn("Supabase profile save error, trying minimal payload:", res.error);
+        var fallbackPayload = {
+          id: targetId,
+          name: name,
+          email: email || (name + "@local"),
+          role: role,
+          assigned_vehicles: assignedVehicles
+        };
+        var fbQuery = isEdit
+          ? AppState.supabase.from('profiles').update(fallbackPayload).eq('id', targetId)
+          : AppState.supabase.from('profiles').insert([fallbackPayload]);
+        return fbQuery;
+      }
+      return res;
+    }).catch(function(err) {
+      console.warn("Supabase profile save exception:", err);
+    });
   }
 
-  promise.then(function() {
-    updateUserInLocalState(targetId, userObj, isEdit);
+  syncPromise.finally(function() {
     showSpinner(false);
     closeModal("modal-user");
     showToast(isEdit ? "🎉 Đã cập nhật tài khoản thành công!" : "🎉 Đã thêm tài khoản mới thành công!");
-    renderUserSelector();
-    renderDashboardView();
-  }).catch(function(err) {
-    showSpinner(false);
-    console.warn("Supabase User Sync Warning:", err);
-    updateUserInLocalState(targetId, userObj, isEdit);
-    closeModal("modal-user");
-    showToast(isEdit ? "🎉 Đã lưu cập nhật tài khoản!" : "🎉 Đã thêm tài khoản thành công!");
     renderUserSelector();
     renderDashboardView();
   });

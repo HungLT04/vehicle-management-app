@@ -6,11 +6,13 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. BẢNG PROFILES (Mở rộng thông tin người dùng từ auth.users)
+-- 1. BẢNG PROFILES (Quản lý tài khoản người dùng)
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  email TEXT NOT NULL,
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  email TEXT,
   name TEXT NOT NULL,
+  username TEXT,
+  password TEXT DEFAULT '123456',
   role TEXT NOT NULL DEFAULT 'USER', -- 'ADMIN' hoặc 'USER'
   assigned_vehicles TEXT DEFAULT 'ALL',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
