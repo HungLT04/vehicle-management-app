@@ -381,6 +381,47 @@
     </div>
   </div>
 
+  <!-- MODAL THÊM / SỬA TÀI KHOẢN -->
+  <div id="modal-user" class="modal-overlay">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-user-title">👤 Thêm / Cập Nhật Tài Khoản</h3>
+        <button class="modal-close" onclick="closeModal('modal-user')">&times;</button>
+      </div>
+      <form id="form-user" onsubmit="saveUserSubmit(event)">
+        <input type="hidden" id="user-id">
+        <div class="form-group">
+          <label class="form-label">Tên người dùng / Họ tên (*)</label>
+          <input type="text" id="user-name" class="form-control" placeholder="Ví dụ: Nguyễn Văn A" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Địa chỉ Email (*)</label>
+          <input type="email" id="user-email" class="form-control" placeholder="nguyenvana@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu đăng nhập (*)</label>
+          <input type="text" id="user-password" class="form-control" placeholder="123456" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Vai trò (*)</label>
+            <select id="user-role" class="form-control">
+              <option value="USER">👤 User (Người dùng)</option>
+              <option value="ADMIN">👑 Admin (Quản trị viên)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phân quyền xe (*)</label>
+            <select id="user-assigned-vehicles" class="form-control">
+              <option value="ALL">Tất cả các xe (ALL)</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU TÀI KHOẢN</button>
+      </form>
+    </div>
+  </div>
+
   <!-- SCRIPT LOGIC MAIN -->
   <script src="app.js"></script>
 </body>

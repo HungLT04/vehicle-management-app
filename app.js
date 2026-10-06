@@ -1607,6 +1607,218 @@ function savePasswordSubmit(event) {
   closeModal("modal-change-password");
 }
 
+/* ==========================================================================
+   USER MANAGEMENT FUNCTIONS (ADMIN MODAL & ACTIONS)
+   ========================================================================== */
+function openAddUserModal() {
+  var uId = document.getElementById("user-id");
+  var uName = document.getElementById("user-name");
+  var uEmail = document.getElementById("user-email");
+  var uPass = document.getElementById("user-password");
+  var uRole = document.getElementById("user-role");
+
+  if (uId) uId.value = "";
+  if (uName) uName.value = "";
+  if (uEmail) uEmail.value = "";
+  if (uPass) uPass.value = "123456";
+  if (uRole) uRole.value = "USER";
+
+  populateAssignedVehiclesSelect("ALL");
+  var title = document.getElementById("modal-user-title");
+  if (title) title.textContent = "➕ Thêm Tài Khoản Người Dùng Mới";
+  openModal("modal-user");
+}
+
+function editUserClick(userId) {
+  var u = (AppState.users || []).find(function(x) { return String(x.id) === String(userId); });
+  if (!u) return;
+
+  var uId = document.getElementById("user-id");
+  var uName = document.getElementById("user-name");
+  var uEmail = document.getElementById("user-email");
+  var uPass = document.getElementById("user-password");
+  var uRole = document.getElementById("user-role");
+
+  if (uId) uId.value = u.id;
+  if (uName) uName.value = u.name || "";
+  if (uEmail) uEmail.value = u.email || "";
+  if (uPass) uPass.value = u.password || "123456";
+  if (uRole) uRole.value = u.role || "USER";
+
+  populateAssignedVehiclesSelect(u.assigned_vehicles || "ALL");
+  var title = document.getElementById("modal-user-title");
+  if (title) title.textContent = "✏️ Cập Nhật Tài Khoản Người Dùng";
+  openModal("modal-user");
+}
+
+function populateAssignedVehiclesSelect(selectedValue) {
+  var select = document.getElementById("user-assigned-vehicles");
+  if (!select) return;
+  select.innerHTML = '<option value="ALL">Tất cả các xe (ALL)</option>';
+  
+  (AppState.vehicles || []).forEach(function(v) {
+    var opt = document.createElement("option");
+    opt.value = v.id;
+    opt.textContent = v.name + " (" + (v.license_plate || v.brand || 'Xe') + ")";
+    select.appendChild(opt);
+  });
+
+  if (selectedValue) {
+    select.value = selectedValue;
+  }
+}
+
+function saveUserSubmit(event) {
+  event.preventDefault();
+  var id = document.getElementById("user-id").value;
+  var name = document.getElementById("user-name").value.trim();
+  var email = document.getElementById("user-email").value.trim();
+  var password = document.getElementById("user-password").value.trim();
+  var role = document.getElementById("user-role").value;
+  var assignedVehicles = document.getElementById("user-assigned-vehicles").value;
+
+  if (!name || !email) {
+    showToast("❌ Vui lòng nhập đầy đủ tên và email!");
+    return;
+  }
+
+  showSpinner(true, 30, "Đang lưu tài khoản...");
+
+  var isEdit = !!id;
+  var targetId = isEdit ? id : generateUUID();
+
+  var userObj = {
+    id: targetId,
+    name: name,
+    email: email,
+    password: password || "123456",
+    role: role,
+    assigned_vehicles: assignedVehicles
+  };
+
+  var profilePayload = {
+    id: targetId,
+    name: name,
+    email: email,
+    role: role,
+    assigned_vehicles: assignedVehicles
+  };
+
+  var promise;
+  if (AppState.supabase) {
+    if (isEdit) {
+      promise = AppState.supabase.from('profiles').update(profilePayload).eq('id', targetId).then(function(res) {
+        if (res.error) throw res.error;
+        return res;
+      });
+    } else {
+      promise = AppState.supabase.from('profiles').insert([profilePayload]).then(function(res) {
+        if (res.error) throw res.error;
+        return res;
+      });
+    }
+  } else {
+    promise = Promise.resolve();
+  }
+
+  promise.then(function() {
+    updateUserInLocalState(targetId, userObj, isEdit);
+    showSpinner(false);
+    closeModal("modal-user");
+    showToast(isEdit ? "🎉 Đã cập nhật tài khoản thành công!" : "🎉 Đã thêm tài khoản mới thành công!");
+    renderLoginUserSelector();
+    renderUserSelector();
+    renderDashboardView();
+  }).catch(function(err) {
+    showSpinner(false);
+    console.warn("Supabase User Sync Warning:", err);
+    updateUserInLocalState(targetId, userObj, isEdit);
+    closeModal("modal-user");
+    showToast(isEdit ? "🎉 Đã lưu cập nhật tài khoản!" : "🎉 Đã thêm tài khoản thành công!");
+    renderLoginUserSelector();
+    renderUserSelector();
+    renderDashboardView();
+  });
+}
+
+function updateUserInLocalState(targetId, userObj, isEdit) {
+  if (!AppState.users) AppState.users = [];
+  if (isEdit) {
+    var idx = AppState.users.findIndex(function(x) { return String(x.id) === String(targetId); });
+    if (idx !== -1) AppState.users[idx] = userObj;
+    else AppState.users.push(userObj);
+  } else {
+    AppState.users.push(userObj);
+  }
+
+  var db = getLocalMockDb();
+  if (!db.users) db.users = [];
+  if (isEdit) {
+    var mIdx = db.users.findIndex(function(x) { return String(x.id) === String(targetId); });
+    if (mIdx !== -1) db.users[mIdx] = userObj;
+    else db.users.push(userObj);
+  } else {
+    db.users.push(userObj);
+  }
+  saveLocalMockDb(db);
+}
+
+function deleteUserClick(userId) {
+  var u = (AppState.users || []).find(function(x) { return String(x.id) === String(userId); });
+  if (!u) return;
+
+  if (u.role === 'ADMIN' && (AppState.currentUser && String(u.id) === String(AppState.currentUser.id))) {
+    showToast("⚠️ Không thể xóa tài khoản Quản Trị Viên đang sử dụng!");
+    return;
+  }
+
+  if (!confirm("Bạn có chắc chắn muốn xóa tài khoản '" + u.name + "' không?")) {
+    return;
+  }
+
+  showSpinner(true, 30, "Đang xóa tài khoản...");
+
+  var promise = AppState.supabase
+    ? AppState.supabase.from('profiles').delete().eq('id', userId)
+    : Promise.resolve();
+
+  promise.then(function() {
+    deleteUserFromLocalState(userId);
+    showSpinner(false);
+    showToast("🗑️ Đã xóa tài khoản thành công!");
+    renderLoginUserSelector();
+    renderUserSelector();
+    renderDashboardView();
+  }).catch(function(err) {
+    showSpinner(false);
+    console.warn("Delete User Warning:", err);
+    deleteUserFromLocalState(userId);
+    showToast("🗑️ Đã xóa tài khoản!");
+    renderLoginUserSelector();
+    renderUserSelector();
+    renderDashboardView();
+  });
+}
+
+function deleteUserFromLocalState(userId) {
+  AppState.users = (AppState.users || []).filter(function(x) { return String(x.id) !== String(userId); });
+  var db = getLocalMockDb();
+  if (db.users) {
+    db.users = db.users.filter(function(x) { return String(x.id) !== String(userId); });
+    saveLocalMockDb(db);
+  }
+}
+
+function generateUUID() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 function openModal(modalId) {
   var el = document.getElementById(modalId);
   if (el) el.classList.add("active");
