@@ -118,7 +118,7 @@ function getLocalMockDb() {
   }
   var defaultDb = {
     users: [
-      { id: "USR-000001", email: "admin@example.com", name: "Quản Trị Viên", password: "123456", role: "ADMIN", assigned_vehicles: "ALL" }
+      { id: "00000000-0000-0000-0000-000000000001", email: "admin@example.com", name: "Quản Trị Viên", username: "admin", password: "123456", role: "ADMIN", assigned_vehicles: "ALL" }
     ],
     vehicles: [],
     fuel: [],
@@ -153,7 +153,6 @@ function initApp() {
   fetchUsers().then(function(users) {
     updateSpinnerProgress(50, "Đồng bộ tài khoản & phân quyền...");
     AppState.users = users;
-    renderLoginUserSelector();
     renderUserSelector();
 
     var savedUserId = localStorage.getItem("vehicle_app_user_id");
@@ -173,80 +172,84 @@ function initApp() {
 }
 
 function fetchUsers() {
+  var defaultAdmin = { id: "00000000-0000-0000-0000-000000000001", email: "admin@example.com", name: "Quản Trị Viên", username: "admin", password: "123456", role: "ADMIN", assigned_vehicles: "ALL" };
+
   if (AppState.supabase) {
     return AppState.supabase.from('profiles').select('*').then(function(res) {
-      if (res.error) throw res.error;
-      var list = res.data || [];
-      if (list.length === 0) {
-        list = [{ id: "USR-000001", email: "admin@example.com", name: "Quản Trị Viên", role: "ADMIN", assigned_vehicles: "ALL" }];
-      }
+      var list = (!res.error && res.data && res.data.length > 0) ? res.data : [defaultAdmin];
       return list;
+    }).catch(function(err) {
+      console.warn("Fetch profiles Supabase error:", err);
+      var db = getLocalMockDb();
+      return (db.users && db.users.length > 0) ? db.users : [defaultAdmin];
     });
   }
   var db = getLocalMockDb();
-  return Promise.resolve(db.users || []);
-}
-
-function renderLoginUserSelector() {
-  var select = document.getElementById("login-user-select");
-  if (!select) return;
-
-  var rawUsers = (AppState.users && AppState.users.length > 0)
-    ? AppState.users
-    : [{ id: 'USR-000001', name: 'Quản Trị Viên', role: 'ADMIN' }];
-
-  select.innerHTML = "";
-  var sorted = rawUsers.slice().sort(function(a, b) {
-    var roleA = String(a.role || "USER").toUpperCase();
-    var roleB = String(b.role || "USER").toUpperCase();
-    if (roleA === "ADMIN" && roleB !== "ADMIN") return 1;
-    if (roleA !== "ADMIN" && roleB === "ADMIN") return -1;
-    return 0;
-  });
-
-  sorted.forEach(function(u) {
-    var opt = document.createElement("option");
-    opt.value = u.id;
-    opt.textContent = (u.role === 'ADMIN' ? '👑 ' : '👤 ') + u.name;
-    select.appendChild(opt);
-  });
+  return Promise.resolve((db.users && db.users.length > 0) ? db.users : [defaultAdmin]);
 }
 
 function showLoginScreen(show) {
   var screen = document.getElementById("login-screen");
   if (screen) screen.style.display = show ? "flex" : "none";
-  if (show) renderLoginUserSelector();
+  if (show) {
+    var uInput = document.getElementById("login-username");
+    var pInput = document.getElementById("login-password");
+    if (uInput && !uInput.value) uInput.value = "Quản Trị Viên";
+    if (pInput) pInput.value = "123456";
+  }
 }
 
 function submitLogin(event) {
-  event.preventDefault();
-  var userId = document.getElementById("login-user-select").value;
-  var pass = document.getElementById("login-password").value;
+  if (event) event.preventDefault();
+  var inputUsername = (document.getElementById("login-username") ? document.getElementById("login-username").value : "").trim();
+  var inputPassword = (document.getElementById("login-password") ? document.getElementById("login-password").value : "").trim();
 
-  var u = AppState.users.find(function(x) { return String(x.id) === String(userId); });
-  if (!u) {
-    showToast("❌ Không tìm thấy tài khoản người dùng.");
+  if (!inputUsername) {
+    showToast("❌ Vui lòng nhập tên đăng nhập!");
     return;
   }
-  var validPass = u.password || "123456";
-  if (String(pass).trim() !== String(validPass).trim()) {
+
+  var target = inputUsername.toLowerCase();
+  var matchedUser = (AppState.users || []).find(function(u) {
+    var uName = String(u.name || "").toLowerCase();
+    var uUsername = String(u.username || "").toLowerCase();
+    var uEmail = String(u.email || "").toLowerCase();
+    return uName === target || uUsername === target || (uEmail && uEmail === target);
+  });
+
+  if (!matchedUser) {
+    if (target === "admin" || target === "quản trị viên" || target === "quan tri vien") {
+      matchedUser = (AppState.users && AppState.users.length > 0)
+        ? AppState.users[0]
+        : { id: "00000000-0000-0000-0000-000000000001", name: "Quản Trị Viên", username: "admin", password: "123456", role: "ADMIN" };
+    }
+  }
+
+  if (!matchedUser) {
+    showToast("❌ Tên đăng nhập không tồn tại!");
+    return;
+  }
+
+  var validPass = matchedUser.password || "123456";
+  if (String(inputPassword) !== String(validPass)) {
     showToast("❌ Mật khẩu không chính xác!");
     return;
   }
 
-  showToast("🎉 Đăng nhập thành công!");
   AppState.currentUser = {
-    id: u.id,
-    email: u.email || "",
-    name: u.name,
-    role: u.role,
-    isAdmin: u.role === 'ADMIN',
-    assignedVehicles: u.assigned_vehicles || 'ALL'
+    id: matchedUser.id,
+    name: matchedUser.name || inputUsername,
+    username: matchedUser.username || matchedUser.name || inputUsername,
+    email: matchedUser.email || "",
+    role: matchedUser.role || "USER",
+    isAdmin: matchedUser.role === 'ADMIN',
+    assigned_vehicles: matchedUser.assigned_vehicles || 'ALL'
   };
 
-  localStorage.setItem("vehicle_app_user_id", u.id);
+  localStorage.setItem("vehicle_app_user_id", matchedUser.id);
   showLoginScreen(false);
-  loadUserVehiclesAndStart(u.id);
+  loadUserVehiclesAndStart(matchedUser.id);
+  showToast("🎉 Đăng nhập thành công! Chào mừng " + AppState.currentUser.name);
 }
 
 function autoLoginUser(userId) {
@@ -256,11 +259,12 @@ function autoLoginUser(userId) {
 
   AppState.currentUser = {
     id: u.id,
-    email: u.email || "",
     name: u.name,
+    username: u.username || u.name,
+    email: u.email || "",
     role: u.role,
     isAdmin: u.role === 'ADMIN',
-    assignedVehicles: u.assigned_vehicles || 'ALL'
+    assigned_vehicles: u.assigned_vehicles || 'ALL'
   };
 
   showLoginScreen(false);
@@ -271,8 +275,6 @@ function logoutUser() {
   localStorage.removeItem("vehicle_app_user_id");
   AppState.currentUser = null;
   AppState.currentVehicleId = null;
-  var passInput = document.getElementById("login-password");
-  if (passInput) passInput.value = "";
   showToast("🔒 Đã đăng xuất tài khoản.");
   showLoginScreen(true);
 }
@@ -304,18 +306,32 @@ function loadUserVehiclesAndStart(userId) {
 }
 
 function fetchVehicles(userId) {
+  var db = getLocalMockDb();
+  var localList = db.vehicles || [];
+
   if (AppState.supabase) {
     return AppState.supabase.from('vehicles').select('*').eq('status', 'ACTIVE').then(function(res) {
-      if (res.error) throw res.error;
-      var list = res.data || [];
+      var supaList = (!res.error && res.data) ? res.data : [];
+      var combinedMap = {};
+      localList.forEach(function(v) { combinedMap[v.id] = v; });
+      supaList.forEach(function(v) { combinedMap[v.id] = v; });
+      var list = Object.values(combinedMap);
+
+      if (AppState.currentUser && !AppState.currentUser.isAdmin) {
+        list = list.filter(function(v) { return String(v.user_id) === String(userId); });
+      }
+      return list;
+    }).catch(function(err) {
+      console.warn("Fetch vehicles Supabase error, using local:", err);
+      var list = localList;
       if (AppState.currentUser && !AppState.currentUser.isAdmin) {
         list = list.filter(function(v) { return String(v.user_id) === String(userId); });
       }
       return list;
     });
   }
-  var db = getLocalMockDb();
-  var list = db.vehicles || [];
+
+  var list = localList;
   if (AppState.currentUser && !AppState.currentUser.isAdmin) {
     list = list.filter(function(v) { return String(v.user_id) === String(userId); });
   }
@@ -373,27 +389,15 @@ function updateNavVisibility() {
 }
 
 function renderUserSelector() {
-  var select = document.getElementById("header-user-select");
-  if (!select) return;
-  select.innerHTML = "";
-
-  var sorted = (AppState.users || []).slice().sort(function(a, b) {
-    var roleA = String(a.role || "USER").toUpperCase();
-    var roleB = String(b.role || "USER").toUpperCase();
-    if (roleA === "ADMIN" && roleB !== "ADMIN") return 1;
-    if (roleA !== "ADMIN" && roleB === "ADMIN") return -1;
-    return 0;
-  });
-
-  sorted.forEach(function(u) {
-    var opt = document.createElement("option");
-    opt.value = u.id;
-    opt.textContent = (u.role === 'ADMIN' ? '👑 ' : '👤 ') + u.name;
-    if (AppState.currentUser && String(u.id) === String(AppState.currentUser.id)) {
-      opt.selected = true;
+  var badge = document.getElementById("header-user-info");
+  if (badge) {
+    if (AppState.currentUser) {
+      var icon = AppState.currentUser.isAdmin ? "👑 " : "👤 ";
+      badge.innerHTML = icon + "<strong>" + AppState.currentUser.name + "</strong>";
+    } else {
+      badge.innerHTML = "👤 Chưa đăng nhập";
     }
-    select.appendChild(opt);
-  });
+  }
   updateNavVisibility();
 }
 
@@ -1509,47 +1513,99 @@ function editVehicle(id) {
 function saveVehicleSubmit(event) {
   event.preventDefault();
   var id = document.getElementById("vehicle-id").value;
+  var name = document.getElementById("vehicle-name").value.trim();
+
+  if (!name) {
+    showToast("❌ Vui lòng nhập tên xe!");
+    return;
+  }
+
   var data = {
     user_id: AppState.currentUser ? AppState.currentUser.id : null,
-    name: document.getElementById("vehicle-name").value,
-    license_plate: document.getElementById("vehicle-plate").value,
-    brand: document.getElementById("vehicle-brand").value,
-    model: document.getElementById("vehicle-model").value,
-    year: document.getElementById("vehicle-year").value,
+    name: name,
+    license_plate: document.getElementById("vehicle-plate").value.trim(),
+    brand: document.getElementById("vehicle-brand").value.trim(),
+    model: document.getElementById("vehicle-model").value.trim(),
+    year: document.getElementById("vehicle-year").value.trim(),
     fuel_type: document.getElementById("vehicle-fuel-type").value,
     current_odometer: Number(document.getElementById("vehicle-curr-odo").value) || 0
   };
 
   showSpinner(true, 40, "Đang lưu thông tin xe...");
-  saveVehicleApi(id, data).then(function() {
-    showToast("🎉 Lưu thông tin xe thành công!");
+  saveVehicleApi(id, data).then(function(savedItem) {
     closeModal("modal-vehicle");
-    return fetchVehicles(AppState.currentUser.id);
+    var userId = AppState.currentUser ? AppState.currentUser.id : null;
+    return fetchVehicles(userId);
   }).then(function(vehicles) {
-    AppState.vehicles = vehicles;
+    AppState.vehicles = vehicles || [];
     renderVehicleSelector();
-    if (vehicles.length > 0) AppState.currentVehicleId = vehicles[vehicles.length - 1].id;
+    if (AppState.vehicles.length > 0) {
+      var targetV = id
+        ? AppState.vehicles.find(function(v) { return String(v.id) === String(id); })
+        : AppState.vehicles[AppState.vehicles.length - 1];
+      AppState.currentVehicleId = targetV ? targetV.id : AppState.vehicles[0].id;
+    }
+    updateNavVisibility();
     refreshCurrentTab();
     showSpinner(false);
+    showToast("🎉 Lưu thông tin xe thành công!");
+  }).catch(function(err) {
+    showSpinner(false);
+    console.error("Save Vehicle Submit Error:", err);
+    showToast("❌ Có lỗi xảy ra khi lưu xe!");
   });
 }
 
 function saveVehicleApi(id, data) {
   if (AppState.supabase) {
-    if (id) return AppState.supabase.from('vehicles').update(data).eq('id', id);
-    return AppState.supabase.from('vehicles').insert([data]);
+    var validUuid = (data.user_id && isValidUUID(data.user_id)) ? data.user_id : null;
+    var payload = Object.assign({}, data);
+    if (!validUuid) delete payload.user_id;
+
+    var query = id
+      ? AppState.supabase.from('vehicles').update(payload).eq('id', id)
+      : AppState.supabase.from('vehicles').insert([payload]);
+
+    return query.then(function(res) {
+      if (res.error) {
+        console.warn("Supabase save vehicle error, saving local:", res.error);
+        return saveVehicleToLocal(id, data);
+      }
+      var savedObj = (res.data && res.data[0]) ? res.data[0] : data;
+      saveVehicleToLocal(id, savedObj);
+      return savedObj;
+    }).catch(function(err) {
+      console.warn("Supabase save vehicle exception, saving local:", err);
+      return saveVehicleToLocal(id, data);
+    });
   }
+  return saveVehicleToLocal(id, data);
+}
+
+function saveVehicleToLocal(id, data) {
   var db = getLocalMockDb();
-  if (id) {
-    var idx = db.vehicles.findIndex(function(v) { return v.id === id; });
-    if (idx >= 0) db.vehicles[idx] = Object.assign({}, db.vehicles[idx], data);
-  } else {
-    data.id = "VEH-" + Date.now();
-    data.status = "ACTIVE";
-    db.vehicles.push(data);
-  }
+  if (!db.vehicles) db.vehicles = [];
+
+  var vehicleId = id || data.id || ("VEH-" + Date.now());
+  data.id = vehicleId;
+  data.status = "ACTIVE";
+
+  var idx = db.vehicles.findIndex(function(v) { return String(v.id) === String(vehicleId); });
+  if (idx >= 0) db.vehicles[idx] = Object.assign({}, db.vehicles[idx], data);
+  else db.vehicles.push(data);
   saveLocalMockDb(db);
-  return Promise.resolve();
+
+  if (!AppState.vehicles) AppState.vehicles = [];
+  var appIdx = AppState.vehicles.findIndex(function(v) { return String(v.id) === String(vehicleId); });
+  if (appIdx >= 0) AppState.vehicles[appIdx] = Object.assign({}, AppState.vehicles[appIdx], data);
+  else AppState.vehicles.push(data);
+
+  return Promise.resolve(data);
+}
+
+function isValidUUID(str) {
+  if (!str || typeof str !== 'string') return false;
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
 }
 
 function updateVehicleOdometerApi(vehicleId, newOdometer) {
@@ -1677,8 +1733,12 @@ function saveUserSubmit(event) {
   var role = document.getElementById("user-role").value;
   var assignedVehicles = document.getElementById("user-assigned-vehicles").value;
 
-  if (!name || !email) {
-    showToast("❌ Vui lòng nhập đầy đủ tên và email!");
+  if (!name) {
+    showToast("❌ Vui lòng nhập Tên đăng nhập / Họ tên!");
+    return;
+  }
+  if (!password) {
+    showToast("❌ Vui lòng nhập Mật khẩu!");
     return;
   }
 
@@ -1690,8 +1750,9 @@ function saveUserSubmit(event) {
   var userObj = {
     id: targetId,
     name: name,
-    email: email,
-    password: password || "123456",
+    username: name,
+    email: email || (name + "@local"),
+    password: password,
     role: role,
     assigned_vehicles: assignedVehicles
   };
@@ -1699,7 +1760,7 @@ function saveUserSubmit(event) {
   var profilePayload = {
     id: targetId,
     name: name,
-    email: email,
+    email: email || (name + "@local"),
     role: role,
     assigned_vehicles: assignedVehicles
   };
@@ -1726,7 +1787,6 @@ function saveUserSubmit(event) {
     showSpinner(false);
     closeModal("modal-user");
     showToast(isEdit ? "🎉 Đã cập nhật tài khoản thành công!" : "🎉 Đã thêm tài khoản mới thành công!");
-    renderLoginUserSelector();
     renderUserSelector();
     renderDashboardView();
   }).catch(function(err) {
@@ -1735,7 +1795,6 @@ function saveUserSubmit(event) {
     updateUserInLocalState(targetId, userObj, isEdit);
     closeModal("modal-user");
     showToast(isEdit ? "🎉 Đã lưu cập nhật tài khoản!" : "🎉 Đã thêm tài khoản thành công!");
-    renderLoginUserSelector();
     renderUserSelector();
     renderDashboardView();
   });
@@ -1786,7 +1845,6 @@ function deleteUserClick(userId) {
     deleteUserFromLocalState(userId);
     showSpinner(false);
     showToast("🗑️ Đã xóa tài khoản thành công!");
-    renderLoginUserSelector();
     renderUserSelector();
     renderDashboardView();
   }).catch(function(err) {
@@ -1794,7 +1852,6 @@ function deleteUserClick(userId) {
     console.warn("Delete User Warning:", err);
     deleteUserFromLocalState(userId);
     showToast("🗑️ Đã xóa tài khoản!");
-    renderLoginUserSelector();
     renderUserSelector();
     renderDashboardView();
   });

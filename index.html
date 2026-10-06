@@ -52,25 +52,23 @@
     <div class="modal-content" style="max-width: 400px; text-align: center; border-radius: var(--radius-lg); padding: 32px 24px; transform: scale(1);">
       <div style="font-size: 3rem; margin-bottom: 6px;">🚗</div>
       <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--primary);">ĐĂNG NHẬP SỔ NHẬT KÝ XE</h2>
-      <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px;">Vui lòng chọn tài khoản hoặc nhập Email/Mật khẩu</p>
+      <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px;">Vui lòng nhập Tên đăng nhập và Mật khẩu để truy cập</p>
 
       <form onsubmit="submitLogin(event)">
         <div class="form-group" style="text-align: left;">
-          <label class="form-label">Chọn tài khoản người dùng</label>
-          <select id="login-user-select" class="form-control" style="font-weight: 700; padding: 12px;">
-            <option value="USR-000001">👑 Quản Trị Viên</option>
-          </select>
+          <label class="form-label">Tên đăng nhập (*)</label>
+          <input type="text" id="login-username" class="form-control" placeholder="Ví dụ: Quản Trị Viên hoặc admin..." required style="padding: 12px;">
         </div>
 
         <div class="form-group" style="text-align: left;">
-          <label class="form-label">Mật khẩu</label>
+          <label class="form-label">Mật khẩu (*)</label>
           <input type="password" id="login-password" class="form-control" placeholder="Nhập mật khẩu..." required style="padding: 12px;">
         </div>
 
         <button type="submit" class="btn btn-primary" style="padding: 14px; font-size: 1rem; margin-top: 10px;">ĐĂNG NHẬP ➔</button>
       </form>
       <div style="margin-top: 16px; font-size: 0.8rem;">
-        <a href="#" onclick="openConfigModal()" style="color: var(--primary); text-decoration: none; font-weight: 700;">⚙️ Đổi Cấu Hình Supabase URL/Key</a>
+        <a href="#" onclick="openConfigModal()" style="color: var(--primary); text-decoration: none; font-weight: 700;">⚙️ Cấu Hình Supabase URL/Key</a>
       </div>
     </div>
   </div>
@@ -95,12 +93,10 @@
       </nav>
     </div>
 
-    <!-- COMBOBOX SELECTORS & CONTROLS -->
+    <!-- CONTROLS & USER BADGE -->
     <div class="header-controls">
-      <div>
-        <select id="header-user-select" class="user-select" onchange="onUserSelectChange(this)">
-          <option value="">User</option>
-        </select>
+      <div id="header-user-info" style="font-weight: 700; font-size: 0.85rem; background: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
+        👤 User
       </div>
 
       <div>
@@ -391,16 +387,16 @@
       <form id="form-user" onsubmit="saveUserSubmit(event)">
         <input type="hidden" id="user-id">
         <div class="form-group">
-          <label class="form-label">Tên người dùng / Họ tên (*)</label>
-          <input type="text" id="user-name" class="form-control" placeholder="Ví dụ: Nguyễn Văn A" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Địa chỉ Email (*)</label>
-          <input type="email" id="user-email" class="form-control" placeholder="nguyenvana@example.com" required>
+          <label class="form-label">Tên đăng nhập / Tên người dùng (*)</label>
+          <input type="text" id="user-name" class="form-control" placeholder="Ví dụ: admin hoặc Nguyễn Văn A" required>
         </div>
         <div class="form-group">
           <label class="form-label">Mật khẩu đăng nhập (*)</label>
           <input type="text" id="user-password" class="form-control" placeholder="123456" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Địa chỉ Email (Không bắt buộc)</label>
+          <input type="email" id="user-email" class="form-control" placeholder="nguyenvana@example.com (có thể bỏ trống)">
         </div>
         <div class="form-row">
           <div class="form-group">
