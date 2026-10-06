@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Quản Lý Xe Cá Nhân - Supabase</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- SUPABASE JS SDK & CHART.JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- SPINNER & PROGRESS OVERLAY -->
+  <div id="spinner-overlay" class="spinner-overlay" style="display: none;">
+    <div class="spinner-box">
+      <div class="spinner"></div>
+      <div id="spinner-percent" class="spinner-percent">0%</div>
+      <div class="spinner-bar-bg">
+        <div id="spinner-bar" class="spinner-bar-fill"></div>
+      </div>
+      <div id="spinner-status" class="spinner-status">Đang xử lý dữ liệu...</div>
+    </div>
+  </div>
+  <div id="app-toast" class="toast"></div>
+
+  <!-- BẢNG CẤU HÌNH KẾT NỐI SUPABASE (HIỂN THỊ KHI CHƯA ĐIỀN API KEY) -->
+  <div id="supabase-config-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 500px; border-radius: var(--radius-lg); transform: scale(1);">
+      <div class="modal-header">
+        <h3 class="modal-title">⚡ CẤU HÌNH SUPABASE API</h3>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+        Vui lòng nhập **Project URL** và **Anon API Key** từ Bảng điều khiển Supabase (`Settings -> API`) của bạn để bắt đầu.
+      </p>
+      <form onsubmit="saveSupabaseConfig(event)">
+        <div class="form-group">
+          <label class="form-label">Supabase Project URL</label>
+          <input type="text" id="config-supabase-url" class="form-control" placeholder="https://your-project.supabase.co" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Supabase Anon Key</label>
+          <input type="password" id="config-supabase-key" class="form-control" placeholder="eyJhYmdj... (Anon Key)" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU CẤU HÌNH & KẾT NỐI ➔</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MÀN HÌNH ĐĂNG NHẬP (LOGIN SCREEN) -->
+  <div id="login-screen" class="modal-overlay" style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); opacity: 1; pointer-events: auto; z-index: 1000; align-items: center;">
+    <div class="modal-content" style="max-width: 400px; text-align: center; border-radius: var(--radius-lg); padding: 32px 24px; transform: scale(1);">
+      <div style="font-size: 3rem; margin-bottom: 6px;">🚗</div>
+      <h2 style="font-size: 1.35rem; font-weight: 800; color: var(--primary);">ĐĂNG NHẬP SỔ NHẬT KÝ XE</h2>
+      <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px;">Vui lòng chọn tài khoản hoặc nhập Email/Mật khẩu</p>
+
+      <form onsubmit="submitLogin(event)">
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label">Chọn tài khoản người dùng</label>
+          <select id="login-user-select" class="form-control" style="font-weight: 700; padding: 12px;">
+            <option value="USR-000001">👑 Quản Trị Viên</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="text-align: left;">
+          <label class="form-label">Mật khẩu</label>
+          <input type="password" id="login-password" class="form-control" placeholder="Nhập mật khẩu..." required style="padding: 12px;">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="padding: 14px; font-size: 1rem; margin-top: 10px;">ĐĂNG NHẬP ➔</button>
+      </form>
+      <div style="margin-top: 16px; font-size: 0.8rem;">
+        <a href="#" onclick="openConfigModal()" style="color: var(--primary); text-decoration: none; font-weight: 700;">⚙️ Đổi Cấu Hình Supabase URL/Key</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="app-title" onclick="switchTab('dashboard')">
+        <span>🚗 Sổ Nhật Ký Xe</span>
+      </div>
+
+      <!-- DESKTOP TOP NAVIGATION LINKS -->
+      <nav class="desktop-nav">
+        <div id="dnav-dashboard" class="desktop-nav-item active" onclick="switchTab('dashboard')">🏠 Trang chủ</div>
+        <div id="dnav-fuel" class="desktop-nav-item" onclick="switchTab('fuel')">⛽ Xăng</div>
+        <div id="dnav-maintenance" class="desktop-nav-item" onclick="switchTab('maintenance')">🔧 Bảo dưỡng</div>
+        <div id="dnav-expense" class="desktop-nav-item" onclick="switchTab('expense')">💰 Chi phí</div>
+        <div id="dnav-reminder" class="desktop-nav-item" onclick="switchTab('reminder')">⏰ Nhắc việc</div>
+        <div id="dnav-report" class="desktop-nav-item" onclick="switchTab('report')">📊 Báo cáo & Lịch sử</div>
+        <div id="dnav-vehicle" class="desktop-nav-item" onclick="switchTab('vehicle')">🚗 Xe</div>
+        <div id="dnav-settings" class="desktop-nav-item" onclick="switchTab('settings')">⚙️ Cài đặt</div>
+      </nav>
+    </div>
+
+    <!-- COMBOBOX SELECTORS & CONTROLS -->
+    <div class="header-controls">
+      <div>
+        <select id="header-user-select" class="user-select" onchange="onUserSelectChange(this)">
+          <option value="">User</option>
+        </select>
+      </div>
+
+      <div>
+        <select id="header-vehicle-select" class="vehicle-select" onchange="onVehicleSelectChange(this)">
+          <option value="">Đang tải...</option>
+        </select>
+      </div>
+
+      <button style="border: 1px solid var(--border-color); background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer;" onclick="openChangePasswordModal()" title="Đổi mật khẩu tài khoản">
+        🔑
+      </button>
+
+      <button style="border: 1px solid var(--border-color); background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer;" onclick="logoutUser()" title="Đăng xuất">
+        🔒
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN DYNAMIC VIEW CONTAINER -->
+  <main id="app-view">
+    <div class="container text-center" style="padding-top: 40px;">
+      <div class="spinner" style="margin: 0 auto;"></div>
+      <p style="margin-top: 14px; color: var(--text-muted);">Đang khởi tạo ứng dụng...</p>
+    </div>
+  </main>
+
+  <!-- BOTTOM NAVIGATION BAR (MOBILE) -->
+  <nav class="bottom-nav">
+    <div id="nav-dashboard" class="nav-item active" onclick="switchTab('dashboard')">
+      <span class="nav-icon">🏠</span>
+      <span>Trang chủ</span>
+    </div>
+    <div id="nav-fuel" class="nav-item" onclick="switchTab('fuel')">
+      <span class="nav-icon">⛽</span>
+      <span>Xăng</span>
+    </div>
+    <div id="nav-maintenance" class="nav-item" onclick="switchTab('maintenance')">
+      <span class="nav-icon">🔧</span>
+      <span>Bảo dưỡng</span>
+    </div>
+    <div id="nav-expense" class="nav-item" onclick="switchTab('expense')">
+      <span class="nav-icon">💰</span>
+      <span>Chi phí</span>
+    </div>
+    <div id="nav-report" class="nav-item" onclick="switchTab('report')">
+      <span class="nav-icon">📊</span>
+      <span>Báo cáo</span>
+    </div>
+  </nav>
+
+  <!-- MODALS -->
+  <!-- MODAL ĐỔ XĂNG -->
+  <div id="modal-fuel" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">⛽ Nhập Lần Đổ Xăng</h3>
+        <button class="modal-close" onclick="closeModal('modal-fuel')">&times;</button>
+      </div>
+      <form id="form-fuel" onsubmit="saveFuelSubmit(event)">
+        <input type="hidden" id="fuel-vehicle-id">
+        <div class="form-group">
+          <label class="form-label">Ngày đổ xăng</label>
+          <input type="date" id="fuel-date" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Số km Odometer hiện tại (*)</label>
+          <input type="number" id="fuel-odometer" class="form-control" placeholder="Ví dụ: 15450" required>
+        </div>
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label">Số Lít nhiên liệu (*)</label>
+            <input type="number" step="0.01" id="fuel-liters" class="form-control" placeholder="Ví dụ: 42.5" oninput="onFuelCalcChange()">
+          </div>
+          <div>
+            <label class="form-label">Đơn giá / Lít (VNĐ)</label>
+            <input type="number" id="fuel-price" class="form-control" placeholder="Ví dụ: 23500" oninput="onFuelCalcChange()">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tổng số tiền (VNĐ) (*)</label>
+          <input type="number" id="fuel-total" class="form-control" placeholder="Ví dụ: 1000000" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Trạm xăng / Địa điểm</label>
+          <input type="text" id="fuel-station" class="form-control" placeholder="Ví dụ: Petrolimex Cầu Giấy">
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU THÔNG TIN ĐỔ XĂNG</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL BẢO DƯỠNG -->
+  <div id="modal-maintenance" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🔧 Ghi Nhận Bảo DƯỠNG & SỬA CHỮA</h3>
+        <button class="modal-close" onclick="closeModal('modal-maintenance')">&times;</button>
+      </div>
+      <form id="form-maintenance" onsubmit="saveMaintenanceSubmit(event)">
+        <input type="hidden" id="mnt-vehicle-id">
+        <div class="form-group">
+          <label class="form-label">Ngày bảo dưỡng</label>
+          <input type="date" id="mnt-date" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Số km Odometer hiện tại (*)</label>
+          <input type="number" id="mnt-odometer" class="form-control" placeholder="Ví dụ: 16000" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Chọn các hạng mục bảo dưỡng (*)</label>
+          <div id="mnt-category-checkboxes" style="background: #f8fafc; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); max-height: 160px; overflow-y: auto;"></div>
+          <input type="text" id="mnt-custom-cat" class="form-control" placeholder="Nhập hạng mục khác nếu không có ở danh sách trên..." style="margin-top: 8px;">
+        </div>
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label">Tiền phụ tùng (VNĐ)</label>
+            <input type="number" id="mnt-parts-cost" class="form-control" placeholder="0" oninput="onMntPartsOrLaborChange()">
+          </div>
+          <div>
+            <label class="form-label">Tiền công thợ (VNĐ)</label>
+            <input type="number" id="mnt-labor-cost" class="form-control" placeholder="0" oninput="onMntPartsOrLaborChange()">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tổng chi phí bảo dưỡng (VNĐ) (*)</label>
+          <input type="number" id="mnt-total-amount" class="form-control" placeholder="0" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tên Garage / Trung tâm bảo dưỡng</label>
+          <input type="text" id="mnt-garage" class="form-control" placeholder="Ví dụ: Honda Tây Hồ">
+        </div>
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label">Lần bảo dưỡng tiếp (Số Km)</label>
+            <input type="number" id="mnt-next-odo" class="form-control" placeholder="Ví dụ: 21000">
+          </div>
+          <div>
+            <label class="form-label">Lần bảo dưỡng tiếp (Ngày)</label>
+            <input type="date" id="mnt-next-date" class="form-control">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU BẢO DƯỠNG</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CHI PHÍ -->
+  <div id="modal-expense" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">💰 Thêm Khoản Chi Phí Khác</h3>
+        <button class="modal-close" onclick="closeModal('modal-expense')">&times;</button>
+      </div>
+      <form id="form-expense" onsubmit="saveExpenseSubmit(event)">
+        <input type="hidden" id="exp-vehicle-id">
+        <div class="form-group">
+          <label class="form-label">Ngày chi trả</label>
+          <input type="date" id="exp-date" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Danh mục chi phí (*)</label>
+          <select id="exp-category" class="form-control" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Số tiền (VNĐ) (*)</label>
+          <input type="number" id="exp-amount" class="form-control" placeholder="Ví dụ: 150000" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Số km Odometer hiện tại (nếu có)</label>
+          <input type="number" id="exp-odometer" class="form-control" placeholder="Ví dụ: 15000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ghi chú / Diễn giải</label>
+          <input type="text" id="exp-desc" class="form-control" placeholder="Ví dụ: Gửi xe qua đêm tại bãi xe">
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU CHI PHÍ</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL NHẮC VIỆC -->
+  <div id="modal-reminder" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">⏰ Thêm Lịch Nhắc Việc</h3>
+        <button class="modal-close" onclick="closeModal('modal-reminder')">&times;</button>
+      </div>
+      <form id="form-reminder" onsubmit="saveReminderSubmit(event)">
+        <input type="hidden" id="rem-vehicle-id">
+        <div class="form-group">
+          <label class="form-label">Tên công việc / Nhắc nhở (*)</label>
+          <input type="text" id="rem-title" class="form-control" placeholder="Ví dụ: Đăng kiểm xe định kỳ" required>
+        </div>
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label">Nhắc khi tới số Km (Odo)</label>
+            <input type="number" id="rem-target-odo" class="form-control" placeholder="Ví dụ: 20000">
+          </div>
+          <div>
+            <label class="form-label">Nhắc khi tới Ngày</label>
+            <input type="date" id="rem-target-date" class="form-control">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU LỊCH NHẮC VIỆC</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL THÊM/SỬA XE -->
+  <div id="modal-vehicle" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🚗 Thêm / Cập Nhật Thông Tin Xe</h3>
+        <button class="modal-close" onclick="closeModal('modal-vehicle')">&times;</button>
+      </div>
+      <form id="form-vehicle" onsubmit="saveVehicleSubmit(event)">
+        <input type="hidden" id="vehicle-id">
+        <div class="form-group">
+          <label class="form-label">Tên xe (*)</label>
+          <input type="text" id="vehicle-name" class="form-control" placeholder="Ví dụ: Honda City RS" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Biển số xe (*)</label>
+          <input type="text" id="vehicle-plate" class="form-control" placeholder="Ví dụ: 30H-123.45">
+        </div>
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label">Hãng xe (*)</label>
+            <input type="text" id="vehicle-brand" class="form-control" placeholder="Ví dụ: Honda" required>
+          </div>
+          <div>
+            <label class="form-label">Dòng xe / Model</label>
+            <input type="text" id="vehicle-model" class="form-control" placeholder="Ví dụ: City">
+          </div>
+        </div>
+        <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="form-label">Năm sản xuất</label>
+            <input type="number" id="vehicle-year" class="form-control" placeholder="2023">
+          </div>
+          <div>
+            <label class="form-label">Nhiên liệu</label>
+            <select id="vehicle-fuel-type" class="form-control">
+              <option value="Xăng">Xăng</option>
+              <option value="Dầu (Diesel)">Dầu (Diesel)</option>
+              <option value="Điện">Điện (EV)</option>
+              <option value="Hybrid">Hybrid</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Số km Odometer hiện tại (*)</label>
+          <input type="number" id="vehicle-curr-odo" class="form-control" placeholder="Ví dụ: 15000" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">LƯU THÔNG TIN XE</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL ĐỔI MẬT KHẨU -->
+  <div id="modal-change-password" class="modal-overlay">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 Đổi Mật Khẩu Tài Khoản</h3>
+        <button class="modal-close" onclick="closeModal('modal-change-password')">&times;</button>
+      </div>
+      <form id="form-change-password" onsubmit="savePasswordSubmit(event)">
+        <div class="form-group">
+          <label class="form-label">Mật khẩu mới (*)</label>
+          <input type="password" id="new-password" class="form-control" placeholder="Nhập mật khẩu mới..." required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Xác nhận mật khẩu mới (*)</label>
+          <input type="password" id="confirm-password" class="form-control" placeholder="Nhập lại mật khẩu mới..." required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px; margin-top: 10px;">ĐỔI MẬT KHẨU</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC MAIN -->
+  <script src="app.js"></script>
+</body>
+</html>
