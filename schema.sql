@@ -146,54 +146,11 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fuel_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.maintenance_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-
--- POLICIES CHO PROFILES
-CREATE POLICY "Public profiles read" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-
--- POLICIES CHO VEHICLES (User thấy xe của mình hoặc Admin thấy tất cả)
-CREATE POLICY "User vehicles select" ON public.vehicles FOR SELECT USING (
-  user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN')
-);
-CREATE POLICY "User vehicles insert" ON public.vehicles FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "User vehicles update" ON public.vehicles FOR UPDATE USING (
-  user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN')
-);
-CREATE POLICY "User vehicles delete" ON public.vehicles FOR DELETE USING (
-  user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN')
-);
-
--- POLICIES CHO FUEL_LOGS
-CREATE POLICY "Fuel logs select" ON public.fuel_logs FOR SELECT USING (user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN'));
-CREATE POLICY "Fuel logs insert" ON public.fuel_logs FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Fuel logs update" ON public.fuel_logs FOR UPDATE USING (user_id = auth.uid());
-CREATE POLICY "Fuel logs delete" ON public.fuel_logs FOR DELETE USING (user_id = auth.uid());
-
--- POLICIES CHO MAINTENANCE_LOGS
-CREATE POLICY "Mnt logs select" ON public.maintenance_logs FOR SELECT USING (user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN'));
-CREATE POLICY "Mnt logs insert" ON public.maintenance_logs FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Mnt logs update" ON public.maintenance_logs FOR UPDATE USING (user_id = auth.uid());
-CREATE POLICY "Mnt logs delete" ON public.maintenance_logs FOR DELETE USING (user_id = auth.uid());
-
--- POLICIES CHO EXPENSES
-CREATE POLICY "Exp logs select" ON public.expenses FOR SELECT USING (user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN'));
-CREATE POLICY "Exp logs insert" ON public.expenses FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Exp logs update" ON public.expenses FOR UPDATE USING (user_id = auth.uid());
-CREATE POLICY "Exp logs delete" ON public.expenses FOR DELETE USING (user_id = auth.uid());
-
--- POLICIES CHO REMINDERS
-CREATE POLICY "Reminders select" ON public.reminders FOR SELECT USING (user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'ADMIN'));
-CREATE POLICY "Reminders insert" ON public.reminders FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Reminders update" ON public.reminders FOR UPDATE USING (user_id = auth.uid());
-CREATE POLICY "Reminders delete" ON public.reminders FOR DELETE USING (user_id = auth.uid());
-
--- POLICIES CHO CATEGORIES
-CREATE POLICY "Categories read" ON public.categories FOR SELECT USING (true);
+-- TẮT ROW LEVEL SECURITY (RLS) ĐỂ ỨNG DỤNG HOẠT ĐỘNG TRỰC TIẾP VỚI SUPABASE ANON KEY
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vehicles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fuel_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.maintenance_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reminders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories DISABLE ROW LEVEL SECURITY;
